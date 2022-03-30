@@ -45,6 +45,7 @@ type CreationInfo struct {
 	Created            string   `json:"created,omitempty"`
 	Creators           []string `json:"creators,omitempty"`
 	LicenceListVersion string   `json:"licenseListVersion,omitempty"`
+	Type			   string   `json:"type,omitempty"`
 }
 
 // Relationship

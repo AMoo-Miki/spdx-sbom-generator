@@ -20,13 +20,14 @@ var errOutputDirDoesNotExist = errors.New("Output Directory does not exist")
 
 // SPDXSettings ...
 type SPDXSettings struct {
-	Version   string
-	Path      string
-	License   bool
-	Depth     string
-	OutputDir string
-	Schema    string
-	Format    models.OutputFormat
+	Version      string
+	Path         string
+	License      bool
+	Depth        string
+	OutputDir    string
+	OutputPrefix string
+	Schema       string
+	Format       models.OutputFormat
 }
 
 type spdxHandler struct {
@@ -78,7 +79,7 @@ func (sh *spdxHandler) Run() error {
 
 	for _, mm := range sh.modulesManager {
 		plugin := mm.Plugin.GetMetadata()
-		filename := fmt.Sprintf("bom-%s.%s", plugin.Slug, getFiletypeForOutputFormat(sh.config.Format))
+		filename := fmt.Sprintf("%s-%s.%s", sh.config.OutputPrefix, plugin.Slug, getFiletypeForOutputFormat(sh.config.Format))
 		outputFile := filepath.Join(sh.config.OutputDir, filename)
 
 		log.Infof("Running generator for Module Manager: `%s` with output `%s`", plugin.Slug, outputFile)
@@ -90,6 +91,7 @@ func (sh *spdxHandler) Run() error {
 		format, err := format.New(format.Config{
 			Filename:     outputFile,
 			ToolVersion:  sh.config.Version,
+			ToolType:     plugin.Slug,
 			OutputFormat: sh.config.Format,
 			GetSource: func() []models.Module {
 				return mm.GetSource()

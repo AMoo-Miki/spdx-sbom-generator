@@ -29,6 +29,7 @@ type Format struct {
 // Config ...
 type Config struct {
 	ToolVersion  string
+	ToolType     string
 	Filename     string
 	OutputFormat models.OutputFormat
 	GetSource    func() []models.Module
@@ -54,7 +55,7 @@ type SPDXRenderer interface {
 // Render prepares and generates the final SPDX document in the specified format
 func (f *Format) Render() error {
 	modules := sortModules(f.Config.GetSource())
-	document, err := buildBaseDocument(f.Config.ToolVersion, modules[0])
+	document, err := buildBaseDocument(f.Config.ToolVersion, f.Config.ToolType, modules[0])
 	if err != nil {
 		return err
 	}
@@ -90,7 +91,7 @@ func (f *Format) Render() error {
 	return nil
 }
 
-func buildBaseDocument(toolVersion string, module models.Module) (*models.Document, error) {
+func buildBaseDocument(toolVersion string, toolType string, module models.Module) (*models.Document, error) {
 	return &models.Document{
 		SPDXVersion:       "SPDX-2.2",
 		DataLicense:       "CC0-1.0",
@@ -100,6 +101,7 @@ func buildBaseDocument(toolVersion string, module models.Module) (*models.Docume
 		CreationInfo: models.CreationInfo{
 			Creators: []string{fmt.Sprintf("Tool: spdx-sbom-generator-%s", toolVersion)},
 			Created:  time.Now().UTC().Format(time.RFC3339),
+			Type:     toolType,
 		},
 		Packages:                []models.Package{},
 		Relationships:           []models.Relationship{},

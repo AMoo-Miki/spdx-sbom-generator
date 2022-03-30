@@ -45,6 +45,7 @@ func init() {
 	rootCmd.Flags().BoolP("include-license-text", "i", false, " Include full license text (default: false)")
 	rootCmd.Flags().StringP("schema", "s", "2.2", "<version> Target schema version (default: '2.2')")
 	rootCmd.Flags().StringP("output-dir", "o", ".", "<output> directory to Write SPDX to file (default: current directory)")
+	rootCmd.Flags().StringP("output-prefix", "x", "bom", "<prefix> to add to output files (default: bom)")
 	rootCmd.Flags().StringP("format", "f", "spdx", "output file format (default: spdx)")
 
 	//rootCmd.MarkFlagRequired("path")
@@ -96,6 +97,7 @@ func generate(cmd *cobra.Command, args []string) {
 	}
 	path := checkOpt("path")
 	outputDir := checkOpt("output-dir")
+	outputPrefix := checkOpt("output-prefix")
 	schema := checkOpt("schema")
 	format := parseOutputFormat(checkOpt("format"))
 	license, err := cmd.Flags().GetBool("include-license-text")
@@ -104,12 +106,13 @@ func generate(cmd *cobra.Command, args []string) {
 	}
 
 	handler, err := handler.NewSPDX(handler.SPDXSettings{
-		Version:   version,
-		Path:      path,
-		License:   license,
-		OutputDir: outputDir,
-		Schema:    schema,
-		Format:    format,
+		Version:      version,
+		Path:         path,
+		License:      license,
+		OutputDir:    outputDir,
+		OutputPrefix: outputPrefix,
+		Schema:       schema,
+		Format:       format,
 	})
 	if err != nil {
 		log.Fatalf("Failed to initialize command: %v", err)
