@@ -72,9 +72,10 @@ func parseDependencyOutput(out []byte) (depInfo, error) {
 			if len(split) != 2 {
 				return depInfo{}, fmt.Errorf("Parse error %v on : %q", len(split), line)
 			}
-			current := split[1]
+			split = strings.Split(split[1], " ")
+			current := split[0]
 
-			depth := (strings.Index(line, "---") - 1) / 4
+			depth := (strings.Index(line, "--- ") - 1) / 5
 			if len(parents) > depth {
 				parents = parents[:depth]
 			} else if len(parents) < depth {
