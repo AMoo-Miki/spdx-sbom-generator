@@ -26,7 +26,9 @@ var (
 	errDependenciesNotFound = errors.New("unable to generate SPDX file, no modules founded. Please install them before running spdx-sbom-generator, e.g.: `yarn install`")
 	yarnRegistry            = "https://registry.yarnpkg.com"
 	lockFile                = "yarn.lock"
-	rg = regexp.MustCompile(`^(((git|hg|svn|bzr)\+)?(http:\/\/www\.|https:\/\/www\.|http:\/\/|https:\/\/|ssh:\/\/|git:\/\/|svn:\/\/|sftp:\/\/|ftp:\/\/)?[a-z0-9]+([\-\.]{1}[a-z0-9]+){0,100}\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*))|(git\+git@[a-zA-Z0-9\.]+:[a-zA-Z0-9/\\.@]+)|(bzr\+lp:[a-zA-Z0-9\.]+)$`)
+	rg                      = regexp.MustCompile(`^(((git|hg|svn|bzr)\+)?(http:\/\/www\.|https:\/\/www\.|http:\/\/|https:\/\/|ssh:\/\/|git:\/\/|svn:\/\/|sftp:\/\/|ftp:\/\/)?[a-z0-9]+([\-\.]{1}[a-z0-9]+){0,100}\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*))|(git\+git@[a-zA-Z0-9\.]+:[a-zA-Z0-9/\\.@]+)|(bzr\+lp:[a-zA-Z0-9\.]+)$`)
+	packageURLExp           = regexp.MustCompile(`^\s+resolved\s+"https://registry.yarnpkg.com/(.+?)/-/(?:.+?)-(\d+\..+?)\.tgz`)
+	noString                = ""
 )
 
 // New creates a new yarn instance
@@ -114,7 +116,7 @@ func (m *yarn) GetRootModule(path string) (*models.Module, error) {
 	}
 	repository := pkResult["repository"]
 	if repository != nil {
-		if rep, ok := repository.(string); ok{
+		if rep, ok := repository.(string); ok {
 			mod.PackageDownloadLocation = rep
 		}
 		if _, ok := repository.(map[string]interface{}); ok && repository.(map[string]interface{})["url"] != nil {
@@ -203,7 +205,7 @@ func (m *yarn) buildDependencies(path string, deps []dependency) ([]models.Modul
 			mod.Modules = map[string]*models.Module{}
 			for _, depD := range d.Dependencies {
 				ar := strings.Split(strings.TrimSpace(depD), " ")
-				name := strings.TrimPrefix(strings.TrimSuffix(strings.TrimPrefix(ar[0], "\""), "\""), "@")
+				name := strings.TrimSuffix(strings.TrimPrefix(ar[0], "\""), "\"")
 				if name == "optionalDependencies:" {
 					continue
 				}
@@ -287,14 +289,22 @@ func readLockFile(path string) ([]dependency, error) {
 		}
 		if isPk {
 			if strings.HasPrefix(text, "  version ") {
-				p[i].Version = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(text, "  version "), "\""), "\"")
-				n := p[i].Name[:strings.Index(p[i].Name, "@")]
-				p[i].Name = n
-				p[i].PkPath = p[i].PkPath[:strings.LastIndex(p[i].PkPath, "@")]
+				// If somehow `resolved` was read first, don't bother with the identifier-extracted name and this version
+				if p[i].Resolved == "" {
+					p[i].Version = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(text, "  version "), "\""), "\"")
+				}
 				continue
 			}
 			if strings.HasPrefix(text, "  resolved ") {
 				p[i].Resolved = strings.TrimPrefix(text, "  resolved ")
+				if depName, depVersion := parseResolvedURL(text); depName != noString && depVersion != noString {
+					p[i].Name = depName
+					p[i].Version = depVersion
+				}
+				continue
+			}
+			if strings.HasPrefix(text, "  name ") {
+				p[i].PkPath = strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(text, "  name "), "\""), "\"")
 				continue
 			}
 			if strings.HasPrefix(text, "  integrity ") {
@@ -319,10 +329,10 @@ func readLockFile(path string) ([]dependency, error) {
 			}
 			name = strings.TrimPrefix(name, "\"")
 			name = strings.TrimSuffix(name, ":")
+			name = strings.TrimSuffix(name, "\"")
+			name = name[:strings.LastIndex(name, "@")]
 
-			dep.PkPath = strings.TrimSuffix(name, "\"")
-			name = strings.TrimPrefix(name, "@")
-
+			dep.PkPath = name
 			dep.Name = name
 			p = append(p, dep)
 			continue
@@ -334,6 +344,14 @@ func readLockFile(path string) ([]dependency, error) {
 	}
 
 	return p, nil
+}
+
+func parseResolvedURL(text string) (string, string) {
+	if matches := packageURLExp.FindStringSubmatch(text); len(matches) >= 2 {
+		return matches[1], matches[2]
+	}
+
+	return noString, noString
 }
 
 func getCopyright(path string) string {
@@ -386,7 +404,7 @@ func appendNestedDependencies(deps []dependency) []dependency {
 		if len(d.Dependencies) > 0 {
 			for _, depD := range d.Dependencies {
 				ar := strings.Split(strings.TrimSpace(depD), " ")
-				name := strings.TrimPrefix(strings.TrimSuffix(strings.TrimPrefix(ar[0], "\""), "\""), "@")
+				name := strings.TrimSuffix(strings.TrimPrefix(ar[0], "\""), "\"")
 				if name == "optionalDependencies:" {
 					continue
 				}
